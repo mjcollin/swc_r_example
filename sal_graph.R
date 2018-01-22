@@ -1,4 +1,13 @@
+# This script is an example of producing a graph in a 
+# reproducible way using R, SQL, and git.
+
+# You may need to uncomment the install lines if you don't
+# have packages installed.
 # install.packages('RSQLite')
+# install.packages('dplyr')
+# install.packages('ggplot2')
+
+# Retrieve data from our database
 library(RSQLite)
 
 con <- dbConnect(drv=SQLite(),
@@ -11,7 +20,12 @@ query <- dbSendQuery(con,
 
 readings <- dbFetch(query)
 
-# install.packages('dplyr')
+# now that the results are in a dataframe, disconnect from the db
+dbClearResult(query)
+dbDisconnect(con)
+
+
+# Correct and format our data for graphing
 library(dplyr)
 
 sal <- readings %>%
@@ -24,17 +38,15 @@ sal <- na.omit(sal)
 # Fix salinity that were recorded as concentrations
 # by mistake
 sal <- sal %>%
-  filter(reading > 1) %>%
-  mutate(cor_reading=reading/100) %>%
-  union(
-    sal %>%
-      filter(reading <= 1 ) %>%
-      mutate(cor_reading=reading)
-  )
+  mutate(cor_reading = 
+           ifelse(reading > 1, reading/100, reading)
+         )
 
 # Change data type of dates to be graphable
 sal$dated <- as.Date(sal$dated)
 
+
+# Make the graph
 library(ggplot2)
 
 ggplot(data=sal,
@@ -42,4 +54,8 @@ ggplot(data=sal,
        geom_line() +
        geom_point()
 
+# write the graph out so it can be used in reports
 ggsave("outputs/sal_graph.jpg", device="jpg")
+
+
+
